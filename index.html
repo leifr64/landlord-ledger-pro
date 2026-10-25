@@ -1,22 +1,99 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Landlord Ledger Pro</title><style>
-:root{font-family:system-ui,-apple-system,sans-serif;color:#18263a;background:#f4f7fb}*{box-sizing:border-box}body{margin:0}header{background:#17324e;color:white;padding:18px 5%;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}h1{font-size:1.3rem;margin:0}main{max-width:1100px;margin:auto;padding:22px 16px}nav{display:flex;gap:8px;overflow:auto;padding:12px 0}button{cursor:pointer;border:0;border-radius:9px;padding:11px 15px;background:#1769aa;color:white;font-weight:650}nav button{background:#e0eaf4;color:#17324e}nav button.active{background:#1769aa;color:white}.panel{background:white;border-radius:14px;padding:20px;margin:14px 0;box-shadow:0 2px 12px #1232}h2{margin:0 0 12px}form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}label{font-size:.9rem;font-weight:600}input,select{display:block;width:100%;margin-top:5px;padding:11px;border:1px solid #c7d3df;border-radius:8px;font:inherit}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:10px;border-bottom:1px solid #e4eaf0} .scroll{overflow-x:auto}.muted{color:#64748b}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.cards .panel{margin:0} .number{font-size:1.5rem;font-weight:750} .danger{color:#a12424}.hidden{display:none} .notice{background:#fff6db;padding:12px;border-radius:9px} @media print{header,nav,button,form,.no-print{display:none!important}main{padding:0}.panel{box-shadow:none}}
-</style></head><body><header><h1>🏠 Landlord Ledger Pro</h1><span>Independent landlord dashboard</span></header><main><div class="notice">Prototype: data stays in this browser only. Use fictional test data, not real tenant information. Export backups regularly.</div><nav id="nav"></nav><section id="view"></section></main><script>
-const tabs=['Dashboard','Properties','Tenants','Transactions','Ledger'];let tab='Dashboard';const key='llp_v1';
-let db;try{db=JSON.parse(localStorage.getItem(key)||'null')}catch(e){}db=db&&Array.isArray(db.properties)&&Array.isArray(db.tenants)&&Array.isArray(db.transactions)?db:{properties:[],tenants:[],transactions:[]};
-const money=n=>Number(n||0).toLocaleString('en-US',{style:'currency',currency:'USD'}),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),id=()=>String(Date.now())+Math.random().toString(36).slice(2,7),save=()=>{try{localStorage.setItem(key,JSON.stringify(db));return true}catch(e){alert('Browser storage unavailable. Please use a regular Chrome tab, not private mode.');return false}},option=(arr,placeholder)=>'<option value="">'+placeholder+'</option>'+arr.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
-function nav(){document.getElementById('nav').innerHTML=tabs.map(t=>'<button class="'+(t===tab?'active':'')+'" data-tab="'+t+'">'+t+'</button>').join('')}
-function rows(headers,items){return '<div class="scroll"><table><thead><tr>'+headers.map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+items.join('')+'</tbody></table></div>'}
-function field(name,label,type='text',extra=''){return '<label>'+label+'<input name="'+name+'" type="'+type+'" '+extra+' required></label>'}
-function select(name,label,opts){return '<label>'+label+'<select name="'+name+'" required>'+opts+'</select></label>'}
-function render(){nav();let v=document.getElementById('view');let props=db.properties,ten=db.tenants,tx=db.transactions;
-if(tab==='Dashboard'){let income=tx.filter(x=>x.kind==='payment').reduce((s,x)=>s+x.amount,0),expense=tx.filter(x=>x.kind==='expense').reduce((s,x)=>s+x.amount,0),charges=tx.filter(x=>x.kind==='charge').reduce((s,x)=>s+x.amount,0);v.innerHTML='<h2>Portfolio Overview</h2><div class="cards">'+[['Properties',props.length],['Tenants',ten.length],['Rent received',money(income)],['Outstanding charges',money(charges-income)],['Recorded expenses',money(expense)],['Cash after expenses',money(income-expense)]].map(a=>'<div class="panel"><div class="muted">'+a[0]+'</div><div class="number">'+a[1]+'</div></div>').join('')+'</div><div class="panel"><p>Start with <b>Properties</b>, then add tenants and enter rent charges and payments.</p><button data-tab="Properties">Add a property</button></div>'}
-if(tab==='Properties')v.innerHTML='<div class="panel"><h2>Add Property</h2><form id="propertyForm">'+field('name','Property name')+field('address','Street address')+field('units','Number of units','number','min="1" value="1"')+'<button type="submit">Save property</button></form></div><div class="panel"><h2>Properties</h2>'+rows(['Name','Address','Units'],props.map(p=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.address)+'</td><td>'+esc(p.units)+'</td></tr>'))+'</div>';
-if(tab==='Tenants')v.innerHTML='<div class="panel"><h2>Add Tenant</h2><form id="tenantForm">'+select('propertyId','Property',option(props,'Choose property'))+field('name','Tenant name')+field('rent','Monthly tenant rent','number','min="0" step=".01"')+field('hap','Monthly housing assistance','number','min="0" step=".01" value="0"')+'<button type="submit">Save tenant</button></form></div><div class="panel"><h2>Tenants</h2>'+rows(['Tenant','Property','Tenant rent','Assistance'],ten.map(t=>'<tr><td>'+esc(t.name)+'</td><td>'+esc(props.find(p=>p.id===t.propertyId)?.name)+'</td><td>'+money(t.rent)+'</td><td>'+money(t.hap)+'</td></tr>'))+'</div>';
-if(tab==='Transactions')v.innerHTML='<div class="panel"><h2>Record Transaction</h2><form id="transactionForm">'+select('tenantId','Tenant',option(ten,'Choose tenant'))+select('kind','Type','<option value="charge">Rent or fee charged</option><option value="payment">Payment received</option><option value="expense">Property expense</option>')+field('date','Date','date','value="'+new Date().toISOString().slice(0,10)+'"')+field('amount','Amount ($)','number','min="0.01" step=".01"')+field('note','Description')+'<button type="submit">Save transaction</button></form></div><div class="panel"><h2>Transactions</h2>'+rows(['Date','Tenant','Type','Amount','Description'],[...tx].reverse().map(x=>'<tr><td>'+esc(x.date)+'</td><td>'+esc(ten.find(t=>t.id===x.tenantId)?.name)+'</td><td>'+esc(x.kind)+'</td><td>'+money(x.amount)+'</td><td>'+esc(x.note)+'</td></tr>'))+'</div>';
-if(tab==='Ledger')v.innerHTML='<div class="panel"><h2>Tenant Ledger</h2><label>Choose tenant<select id="ledgerTenant">'+option(ten,'Select tenant')+'</select></label><p class="muted">Ledger shows entered charges and payments only. Expenses are excluded from tenant balances.</p><button id="print">Print / Save PDF</button></div><div id="ledgerOutput"></div>';
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Landlord Ledger Pro</title>
+<style>
+:root{font-family:system-ui,-apple-system,sans-serif;color:#17283d;background:#f3f6fa}*{box-sizing:border-box}body{margin:0}header{background:#17324e;color:white;padding:18px 5%;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}h1{font-size:1.3rem;margin:0}main{max-width:1100px;margin:auto;padding:22px 16px}.panel{background:white;border-radius:12px;padding:20px;margin:14px 0;box-shadow:0 2px 12px #1232}nav{display:flex;gap:8px;overflow:auto;padding:12px 0}button{cursor:pointer;border:0;border-radius:8px;padding:11px 15px;background:#1769aa;color:white;font-weight:650}button:disabled{opacity:.5;cursor:wait}nav button{background:#e0eaf4;color:#17324e}nav button.active{background:#1769aa;color:white}form{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:12px}label{font-size:.9rem;font-weight:600}input,select{display:block;width:100%;margin-top:5px;padding:11px;border:1px solid #c7d3df;border-radius:8px;font:inherit}h2{margin:0 0 12px}table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:10px;border-bottom:1px solid #e4eaf0}.scroll{overflow-x:auto}.muted{color:#64748b}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.cards .panel{margin:0}.number{font-size:1.5rem;font-weight:750}.notice{background:#fff4d7;padding:12px;border-radius:9px;margin-bottom:14px}.error{background:#ffe9e9}.hidden{display:none!important}.small{font-size:.9rem}.auth{max-width:680px;margin:30px auto}@media print{header,nav,button,form,.no-print,#auth{display:none!important}main{padding:0}.panel{box-shadow:none}}
+</style></head><body>
+<header><h1>🏠 Landlord Ledger Pro</h1><div id="account">Secure cloud ledger</div></header>
+<main><div id="status" role="status" class="notice">Connecting to secure database…</div><section id="auth" class="panel auth hidden"><h2>Sign in or create an account</h2><p class="muted">Your rental records are tied to your account and protected by database access policies.</p><form id="authForm"><label>Email<input name="email" type="email" autocomplete="email" required></label><label>Password<input name="password" type="password" autocomplete="current-password" minlength="6" required></label><button type="submit" name="action" value="signin">Sign in</button><button type="submit" name="action" value="signup">Create account</button></form><p class="small muted">New accounts may require email confirmation before signing in.</p></section>
+<div id="app" class="hidden"><nav id="nav"></nav><section id="view"></section></div></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/dist/umd/supabase.min.js"></script>
+<script>
+'use strict';
+const URL='https://zwawiuzhmxctrixejmyc.supabase.co',KEY='sb_publishable_Vi8jUAeE4vvPbK6KkFI7Iw_5k49hEu0';
+const client=window.supabase?.createClient(URL,KEY),tabs=['Dashboard','Properties','Tenants','Transactions','Ledger'];
+let tab='Dashboard',user=null,db={properties:[],tenants:[],leases:[],charges:[],payments:[],expenses:[]},busy=false;
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money=n=>Number(n||0).toLocaleString('en-US',{style:'currency',currency:'USD'}),today=()=>new Date().toLocaleDateString('en-CA'),opts=(arr,placeholder)=>'<option value="">'+placeholder+'</option>'+arr.map(x=>'<option value="'+esc(x.id)+'">'+esc(x.name)+'</option>').join('');
+const field=(name,label,type='text',extra='')=>'<label>'+label+'<input name="'+name+'" type="'+type+'" '+extra+' required></label>';
+const select=(name,label,items)=>'<label>'+label+'<select name="'+name+'" required>'+items+'</select></label>';
+const rows=(headers,items)=>'<div class="scroll"><table><thead><tr>'+headers.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+items.join('')+'</tbody></table></div>';
+function message(s,error=false){$('#status').textContent=s;$('#status').className='notice'+(error?' error':'');$('#status').classList.remove('hidden')}
+function nav(){$('#nav').innerHTML=tabs.map(t=>'<button data-tab="'+t+'" class="'+(tab===t?'active':'')+'">'+t+'</button>').join('')}
+async function load(){
+ if(!user)return;
+ const names=['properties','tenants','leases','charges','payments','expenses'];
+ const results=await Promise.all(names.map(n=>client.from(n).select('*').order('created_at',{ascending:true})));
+ for(let i=0;i<names.length;i++){if(results[i].error)throw Error(names[i]+': '+results[i].error.message);db[names[i]]=results[i].data||[]}
+ message('Cloud sync active. Signed in as '+user.email+'. Your old browser-only test records were not imported.');
+ render();
 }
-function ledger(){let t=db.tenants.find(x=>x.id===document.getElementById('ledgerTenant')?.value),el=document.getElementById('ledgerOutput');if(!t){el.innerHTML='';return}let balance=0,items=db.transactions.filter(x=>x.tenantId===t.id&&x.kind!=='expense').sort((a,b)=>a.date.localeCompare(b.date)).map(x=>{balance+=x.kind==='charge'?x.amount:-x.amount;return '<tr><td>'+esc(x.date)+'</td><td>'+esc(x.note)+'</td><td>'+esc(x.kind)+'</td><td>'+money(x.amount)+'</td><td>'+money(balance)+'</td></tr>'});el.innerHTML='<div class="panel"><h2>'+esc(t.name)+'</h2><p>Property: '+esc(db.properties.find(p=>p.id===t.propertyId)?.address)+'</p><p><b>Balance: '+money(balance)+'</b></p>'+rows(['Date','Description','Type','Amount','Balance'],items)+'</div>'}
-document.addEventListener('click',e=>{let b=e.target.closest('[data-tab]');if(b){tab=b.dataset.tab;render()}if(e.target.id==='print')window.print()});document.addEventListener('change',e=>{if(e.target.id==='ledgerTenant')ledger()});
-document.addEventListener('submit',e=>{if(!['propertyForm','tenantForm','transactionForm'].includes(e.target.id))return;e.preventDefault();let d=Object.fromEntries(new FormData(e.target));if(e.target.id==='propertyForm'){db.properties.push({...d,id:id(),units:Number(d.units)})}if(e.target.id==='tenantForm'){db.tenants.push({...d,id:id(),rent:Number(d.rent),hap:Number(d.hap)})}if(e.target.id==='transactionForm'){db.transactions.push({...d,id:id(),amount:Number(d.amount)})}if(save())render()});render();
+async function sessionChange(u){
+ user=u;$('#auth').classList.toggle('hidden',!!u);$('#app').classList.toggle('hidden',!u);
+ $('#account').innerHTML=u?'<span>'+esc(u.email)+'</span> <button id="logout">Sign out</button>':'Secure cloud ledger';
+ if(u){try{await load()}catch(e){message('Unable to load records: '+e.message,true)}}else message('Sign in to access your private cloud records.');
+}
+function render(){
+ nav();let p=db.properties,t=db.tenants,c=db.charges,pa=db.payments,e=db.expenses,v=$('#view');
+ if(tab==='Dashboard'){
+ const received=pa.reduce((s,x)=>s+Number(x.amount),0),charged=c.reduce((s,x)=>s+Number(x.amount),0),spent=e.reduce((s,x)=>s+Number(x.amount),0);
+ v.innerHTML='<h2>Portfolio Overview</h2><div class="cards">'+[['Properties',p.length],['Tenants',t.length],['Payments received',money(received)],['Outstanding charges',money(charged-received)],['Expenses',money(spent)],['Cash after expenses',money(received-spent)]].map(x=>'<div class="panel"><div class="muted">'+x[0]+'</div><div class="number">'+x[1]+'</div></div>').join('')+'</div><div class="panel"><p>Start with a property, then a tenant and lease. Enter charges and payments to build a tenant ledger.</p><button data-tab="Properties">Add property</button></div>';
+ }
+ if(tab==='Properties')v.innerHTML='<div class="panel"><h2>Add Property</h2><form id="propertyForm">'+field('name','Property name')+field('address','Street address')+field('units','Units','number','min="1" value="1"')+'<button>Save property</button></form></div><div class="panel"><h2>Properties</h2>'+rows(['Name','Address','Units'],p.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.address)+'</td><td>'+esc(x.units)+'</td></tr>'))+'</div>';
+ if(tab==='Tenants')v.innerHTML='<div class="panel"><h2>Add Tenant and Lease</h2><form id="tenantForm">'+select('property_id','Property',opts(p,'Choose property'))+field('name','Tenant name')+field('start_date','Lease start','date','value="'+today()+'"')+field('monthly_rent','Total monthly rent ($)','number','min="0" step=".01"')+field('monthly_hap','Monthly housing assistance ($)','number','min="0" step=".01" value="0"')+'<button>Save tenant and lease</button></form></div><div class="panel"><h2>Tenants</h2>'+rows(['Tenant','Property','Total rent','Housing assistance'],t.map(x=>{let l=db.leases.find(z=>z.tenant_id===x.id);return '<tr><td>'+esc(x.name)+'</td><td>'+esc(p.find(z=>z.id===x.property_id)?.name)+'</td><td>'+money(l?.monthly_rent)+'</td><td>'+money(l?.monthly_hap)+'</td></tr>'}))+'</div>';
+ if(tab==='Transactions'){
+ let all=[...c.map(x=>({date:x.charge_date,type:'Charge',amount:x.amount,tenant:x.tenant_id,note:x.description})),...pa.map(x=>({date:x.payment_date,type:'Payment ('+x.source+')',amount:x.amount,tenant:x.tenant_id,note:x.notes})),...e.map(x=>({date:x.expense_date,type:'Expense',amount:x.amount,tenant:null,note:x.description}))].sort((a,b)=>b.date.localeCompare(a.date));
+ v.innerHTML='<div class="panel"><h2>Record Charge or Payment</h2><form id="transactionForm">'+select('tenant_id','Tenant',opts(t,'Choose tenant'))+select('kind','Type','<option value="charge">Rent or fee charged</option><option value="payment">Payment received</option>')+field('date','Date','date','value="'+today()+'"')+field('amount','Amount ($)','number','min=".01" step=".01"')+field('note','Description')+select('source','Payment source','<option value="tenant">Tenant</option><option value="housing_assistance">Housing assistance / Section 8</option><option value="other">Other</option>')+select('category','Charge category','<option value="rent">Rent</option><option value="late_fee">Late fee</option><option value="utility">Utility</option><option value="garbage">Garbage</option><option value="other">Other</option>')+'<button>Save transaction</button></form></div><div class="panel"><h2>Record Property Expense</h2><form id="expenseForm">'+select('property_id','Property',opts(p,'Choose property'))+field('expense_date','Date','date','value="'+today()+'"')+field('amount','Amount ($)','number','min=".01" step=".01"')+field('category','Category')+field('description','Description')+'<button>Save expense</button></form></div><div class="panel"><h2>Transactions</h2>'+rows(['Date','Tenant','Type','Amount','Description'],all.map(x=>'<tr><td>'+esc(x.date)+'</td><td>'+esc(t.find(z=>z.id===x.tenant)?.name||'—')+'</td><td>'+esc(x.type)+'</td><td>'+money(x.amount)+'</td><td>'+esc(x.note)+'</td></tr>'))+'</div>';
+ }
+ if(tab==='Ledger')v.innerHTML='<div class="panel"><h2>Tenant Ledger</h2><label>Choose tenant<select id="ledgerTenant">'+opts(t,'Select tenant')+'</select></label><p class="muted">Shows entered charges and payments only; recurring rent is not yet generated automatically.</p><button id="print">Print / Save PDF</button></div><div id="ledgerOutput"></div>';
+}
+function ledger(){
+ let t=db.tenants.find(x=>x.id===$('#ledgerTenant')?.value),out=$('#ledgerOutput');if(!t){out.innerHTML='';return}
+ let a=[...db.charges.filter(x=>x.tenant_id===t.id).map(x=>({date:x.charge_date,kind:'Charge',amount:Number(x.amount),note:x.description,id:x.id})),...db.payments.filter(x=>x.tenant_id===t.id).map(x=>({date:x.payment_date,kind:'Payment',amount:Number(x.amount),note:x.notes||x.source,id:x.id}))].sort((x,y)=>x.date.localeCompare(y.date)||x.id.localeCompare(y.id));
+ let balance=0,items=a.map(x=>{balance+=x.kind==='Charge'?x.amount:-x.amount;return '<tr><td>'+esc(x.date)+'</td><td>'+esc(x.note)+'</td><td>'+x.kind+'</td><td>'+money(x.amount)+'</td><td>'+money(balance)+'</td></tr>'});
+ out.innerHTML='<div class="panel"><h2>'+esc(t.name)+'</h2><p>Property: '+esc(db.properties.find(x=>x.id===t.property_id)?.address)+'</p><p><b>Balance: '+money(balance)+'</b></p>'+rows(['Date','Description','Type','Amount','Balance'],items)+'</div>';
+}
+document.addEventListener('click',async e=>{
+ let b=e.target.closest('[data-tab]');if(b){tab=b.dataset.tab;render()}
+ if(e.target.id==='print')window.print();
+ if(e.target.id==='logout'){const {error}=await client.auth.signOut();if(error)message(error.message,true)}
+});
+document.addEventListener('change',e=>{if(e.target.id==='ledgerTenant')ledger()});
+document.addEventListener('submit',async e=>{
+ const f=e.target;if(!['authForm','propertyForm','tenantForm','transactionForm','expenseForm'].includes(f.id))return;e.preventDefault();if(busy)return;busy=true;
+ const buttons=[...f.querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);
+ try{
+ let d=Object.fromEntries(new FormData(f)),result;
+ if(f.id==='authForm'){
+ const action=e.submitter?.value||'signin';
+ result=action==='signup'?await client.auth.signUp({email:d.email,password:d.password,options:{emailRedirectTo:location.origin+location.pathname}}):await client.auth.signInWithPassword({email:d.email,password:d.password});
+ if(result.error)throw result.error;
+ if(action==='signup'&&!result.data.session)message('Account created. Check your email to confirm your address, then sign in.');
+ else if(result.data.user)await sessionChange(result.data.user);
+ return;
+ }
+ if(!user)throw Error('Please sign in first.');
+ if(f.id==='propertyForm')result=await client.from('properties').insert({name:d.name,address:d.address,units:Number(d.units)});
+ if(f.id==='tenantForm'){
+ if(Number(d.monthly_hap)>Number(d.monthly_rent))throw Error('Housing assistance cannot exceed total rent.');
+ result=await client.from('tenants').insert({property_id:d.property_id,name:d.name}).select('id').single();
+ if(result.error)throw result.error;
+ const lease=await client.from('leases').insert({tenant_id:result.data.id,start_date:d.start_date,monthly_rent:Number(d.monthly_rent),monthly_hap:Number(d.monthly_hap),status:'active'});
+ if(lease.error)throw Error('Tenant saved, but lease failed: '+lease.error.message);
+ }
+ if(f.id==='transactionForm'){
+ if(d.kind==='charge')result=await client.from('charges').insert({tenant_id:d.tenant_id,charge_date:d.date,amount:Number(d.amount),description:d.note,category:d.category});
+ else result=await client.from('payments').insert({tenant_id:d.tenant_id,payment_date:d.date,amount:Number(d.amount),notes:d.note,source:d.source});
+ }
+ if(f.id==='expenseForm')result=await client.from('expenses').insert({property_id:d.property_id,expense_date:d.expense_date,amount:Number(d.amount),category:d.category,description:d.description});
+ if(result?.error)throw result.error;
+ await load();
+ }catch(err){message('Save failed: '+err.message,true)}finally{busy=false;buttons.forEach(b=>b.disabled=false)}
+});
+(async()=>{
+ if(!client){message('Unable to load the database client. Check your network and reload.',true);return}
+ const {data,error}=await client.auth.getUser();
+ if(error&&error.name!=='AuthSessionMissingError')message('Authentication check: '+error.message,true);
+ await sessionChange(data?.user||null);
+ client.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_OUT')sessionChange(null);if(event==='SIGNED_IN'&&session?.user&&!user)sessionChange(session.user)});
+})();
 </script></body></html>
